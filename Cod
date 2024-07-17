@@ -1,0 +1,143 @@
+#include <IRremote.h>
+#include <Servo.h>
+
+Servo servo;
+int trigPin = 11;
+int echoPin = 12;
+long duration;
+int distance;
+const int RECV_PIN = 2;  // Pinul pe care este conectat receptorul IR
+IRrecv irrecv(RECV_PIN);
+decode_results results;
+int state = 0; // Inițializăm variabila de control a while
+int mode = 0;
+int currentMode = 0;           // 0 pentru ridica_automat, 1 pentru mod_telecomanda
+int butonPin = 4;
+bool lastButtonState = LOW;    // Starea precedentă a butonului
+bool currentButtonState = LOW; // Starea curentă a butonului      
+void setup() {
+  Serial.begin(9600);  // Inițializează comunicația serială cu PC-ul
+  irrecv.enableIRIn(); // Activează receptorul IR pentru a primi semnale
+  servo.attach(13); // Conectează servo la pinul 9
+  Serial.println("Ready to receive IR signals");
+  servo.attach(13);
+ servo.write(180);
+ delay(2000);
+ pinMode(7,OUTPUT);
+ pinMode(6,OUTPUT);
+ pinMode(5,OUTPUT);
+ pinMode(10,OUTPUT);
+ pinMode(9,OUTPUT);
+ pinMode(4,INPUT);
+ //Sets the trigPin as an Output
+ pinMode(trigPin,OUTPUT);
+ //Sets the echopin as an Input
+ pinMode(echoPin, INPUT);
+}
+
+void ridica_automat(){
+//functia pentru modul automat 
+ digitalWrite(trigPin, LOW);
+            delayMicroseconds(2);
+            
+            digitalWrite(trigPin, HIGH);
+            delayMicroseconds(10);
+            digitalWrite(trigPin, LOW);
+            duration = pulseIn(echoPin,HIGH);
+            distance = duration*0.034/2;
+            Serial.println("Distance:");
+            Serial.print(distance);
+            if(distance<= 10)
+            {
+            servo.write(180);
+             digitalWrite(9, HIGH);
+             digitalWrite(10,LOW);
+            delay(3000);
+            digitalWrite(9,LOW);
+            digitalWrite(10,HIGH);
+            }
+            else
+            {
+              servo.write(100);
+              digitalWrite(10, HIGH);
+                    }        
+
+        if (distance > 20) {
+            digitalWrite(7, HIGH); // Aprindem LED-ul 1
+            digitalWrite(6, LOW);  // Stingem LED-ul 2
+            digitalWrite(5, LOW);  // Stinge LED-ul 3
+          } else if (distance >=14 && distance <=20) {
+            digitalWrite(7, HIGH); // Aprindem LED-ul 1
+            digitalWrite(6, HIGH);  // Aprinde LED-ul 2
+            digitalWrite(5, LOW);  // Stinge LED-ul 3
+          } else {
+            digitalWrite(7, HIGH); // Aprindem LED-ul 1
+            digitalWrite(6, HIGH);  // Aprinde LED-ul 2
+            digitalWrite(5, HIGH);  // Aprinde LED-ul 3
+          }
+
+      
+
+
+
+
+
+
+}
+
+ void mod_telecomanda(){
+//functia pentru modul telecomanda
+  if (irrecv.decode()) {
+    // Identificăm butonul și afișăm codul IR asociat
+    Serial.print("Received IR code: ");
+    Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
+    
+    if (irrecv.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT) {
+      irrecv.resume(); // Continuă cu următoarea decodificare
+      return;
+    }
+       if (irrecv.decodedIRData.decodedRawData == 0xF30CFF00) { // Comanda pentru servo la 180
+        servo.write(180);
+          digitalWrite(9, HIGH);
+             digitalWrite(10,LOW);
+        Serial.println("rotit cu 180");
+      } else if (irrecv.decodedIRData.decodedRawData == 0xE718FF00) { // Comanda pentru servo la 100
+        servo.write(110);
+        digitalWrite(9,LOW);
+            digitalWrite(10,HIGH);
+         Serial.println("rotit cu 130");
+      }
+       irrecv.resume();
+ }
+ }
+void loop() {
+
+ currentButtonState = digitalRead(butonPin); // Citește starea butonului
+
+  // Detectează o apăsare de buton (tranziție de la LOW la HIGH)
+  if (currentButtonState == HIGH && lastButtonState == LOW) {
+    // Debouncing - așteaptă puțin și verifică din nou starea butonului
+    delay(50);
+    if (digitalRead(butonPin) == HIGH) {
+      // Comută între moduri
+      currentMode = !currentMode;
+      
+      // Afișează modul curent pentru debugging
+      if (currentMode == 0) {
+        Serial.println("Mod: ridica_automat");
+      } else {
+        Serial.println("Mod: mod_telecomanda");
+      }
+    }
+  }
+  
+  // Actualizează starea precedentă a butonului
+  lastButtonState = currentButtonState;
+
+  // Apelează funcțiile corespunzătoare în funcție de modul curent
+  if (currentMode == 0) {
+    ridica_automat();
+  } else {
+    mod_telecomanda();
+  }
+}
